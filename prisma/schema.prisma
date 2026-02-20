@@ -1,6 +1,7 @@
 generator client {
     provider = "prisma-client-js"
-    binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/deriv_trading_bot/nextjs_space/node_modules/.prisma/client"
 }
 
 datasource db {
@@ -9,16 +10,17 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  password      String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  apiTokens     ApiToken[]
-  settings      TradingSettings?
-  trades        Trade[]
-  sessions      Session[]
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  password        String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  apiTokens       ApiToken[]
+  settings        TradingSettings?
+  trades          Trade[]
+  sessions        Session[]
+  tradingSession  TradingSession?
 }
 
 model Session {
@@ -78,4 +80,25 @@ model Trade {
   accountType     String   // 'demo' or 'live'
   createdAt       DateTime @default(now())
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Server-side trading session
+model TradingSession {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  isActive            Boolean  @default(false)
+  status              String   @default("STOPPED") // STOPPED, RUNNING, PAUSED
+  market              String   @default("R_10")
+  accountType         String   @default("demo")
+  currentStake        Float    @default(1.0)
+  consecutiveLosses   Int      @default(0)
+  sessionProfit       Float    @default(0)
+  balance             Float    @default(0)
+  lastSignal          String?
+  lastError           String?
+  startedAt           DateTime?
+  stoppedAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

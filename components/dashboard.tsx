@@ -5,7 +5,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import {
   TrendingUp, LogOut, Play, Pause, Square, Settings,
-  DollarSign, Activity, AlertTriangle, BarChart3, Loader2
+  DollarSign, Activity, AlertTriangle, BarChart3, Loader2, Server, Monitor, Cloud
 } from 'lucide-react';
 import { MARKETS } from '@/lib/deriv';
 import { TradingSettings, BotState, Trade, Candle } from '@/lib/types';
@@ -45,6 +45,19 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'status' | 'settings' | 'tokens'>('status');
   const [stats, setStats] = useState({ allTimeProfit: 0, sessionProfit: 0, wins: 0, losses: 0, winRate: 0, balanceHistory: [] });
   
+  // Server-side trading state
+  const [tradingMode, setTradingMode] = useState<'browser' | 'server'>('server');
+  const [serverStatus, setServerStatus] = useState({
+    isActive: false,
+    status: 'STOPPED',
+    balance: 0,
+    sessionProfit: 0,
+    consecutiveLosses: 0,
+    currentStake: 1,
+    lastSignal: 'Not started',
+  });
+  const [serverLoading, setServerLoading] = useState(false);
+  
   const wsRef = useRef<WebSocket | null>(null);
   const candlesRef = useRef<Candle[]>([]);
   const botStateRef = useRef(botState);
@@ -76,11 +89,12 @@ export default function Dashboard() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [settingsRes, tokensRes, tradesRes, statsRes] = await Promise.all([
+        const [settingsRes, tokensRes, tradesRes, statsRes, serverStatusRes] = await Promise.all([
           fetch('/api/settings'),
           fetch('/api/tokens'),
           fetch('/api/trades?limit=10'),
           fetch('/api/stats'),
+          fetch('/api/server-trading/status'),
         ]);
         
         if (settingsRes.ok) {
@@ -96,6 +110,10 @@ export default function Dashboard() {
           setStats(st);
           setBotState(prev => ({ ...prev, allTimeProfit: st.allTimeProfit, sessionProfit: st.sessionProfit }));
         }
+        if (serverStatusRes.ok) {
+          const ss = await serverStatusRes.json();
+          setServerStatus(ss);
+        }
       } catch (err) {
         console.error('Failed to load data:', err);
       } finally {
@@ -103,6 +121,68 @@ export default function Dashboard() {
       }
     };
     loadData();
+  }, []);
+
+  // Poll server trading status
+  useEffect(() => {
+    if (tradingMode !== 'server') return;
+    
+    const pollStatus = async () => {
+      try {
+        const res = await fetch('/api/server-trading/status');
+        if (res.ok) {
+          const ss = await res.json();
+          setServerStatus(ss);
+          // Also refresh trades when server is active
+          if (ss.isActive) {
+            const tradesRes = await fetch('/api/trades?limit=10');
+            if (tradesRes.ok) setTrades(await tradesRes.json());
+          }
+        }
+      } catch (err) {
+        console.error('Failed to poll server status:', err);
+      }
+    };
+
+    const interval = setInterval(pollStatus, 3000);
+    return () => clearInterval(interval);
+  }, [tradingMode]);
+
+  // Server-side trading controls
+  const startServerTrading = useCallback(async () => {
+    setServerLoading(true);
+    try {
+      const res = await fetch('/api/server-trading/start', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setServerStatus(prev => ({ ...prev, isActive: true, status: 'RUNNING', lastSignal: 'Starting...' }));
+      } else {
+        alert(data.error || 'Failed to start trading');
+      }
+    } catch (err) {
+      console.error('Failed to start server trading:', err);
+      alert('Failed to start trading');
+    } finally {
+      setServerLoading(false);
+    }
+  }, []);
+
+  const stopServerTrading = useCallback(async () => {
+    setServerLoading(true);
+    try {
+      const res = await fetch('/api/server-trading/stop', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setServerStatus(prev => ({ ...prev, isActive: false, status: 'STOPPED', lastSignal: 'Stopped' }));
+      } else {
+        alert(data.error || 'Failed to stop trading');
+      }
+    } catch (err) {
+      console.error('Failed to stop server trading:', err);
+      alert('Failed to stop trading');
+    } finally {
+      setServerLoading(false);
+    }
   }, []);
 
   const connectWebSocket = useCallback(() => {
@@ -450,6 +530,12 @@ export default function Dashboard() {
       case 'stop':
         stopBot();
         break;
+      case 'server-start':
+        startServerTrading();
+        break;
+      case 'server-stop':
+        stopServerTrading();
+        break;
     }
     setConfirmDialog({ open: false, action: '', message: '' });
   };
@@ -509,6 +595,61 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* Trading Mode Toggle */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card mb-4"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Cloud className="w-5 h-5 text-fuchsia-400" />
+              <div>
+                <h3 className="text-sm font-semibold text-white">Trading Mode</h3>
+                <p className="text-xs text-gray-400">
+                  {tradingMode === 'server' 
+                    ? '24/7 Server Trading - Runs even when your computer is off' 
+                    : 'Browser Trading - Runs only while this page is open'}
+                </p>
+              </div>
+            </div>
+            <div className="flex bg-[#252542] rounded-lg p-1">
+              <button
+                onClick={() => {
+                  if (botState.status === 'STOPPED' && !serverStatus.isActive) {
+                    setTradingMode('browser');
+                  }
+                }}
+                disabled={botState.status !== 'STOPPED' || serverStatus.isActive}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  tradingMode === 'browser'
+                    ? 'bg-fuchsia-600 text-white'
+                    : 'text-gray-400 hover:text-white disabled:opacity-50'
+                }`}
+              >
+                <Monitor className="w-4 h-4" />
+                Browser
+              </button>
+              <button
+                onClick={() => {
+                  if (botState.status === 'STOPPED' && !serverStatus.isActive) {
+                    setTradingMode('server');
+                  }
+                }}
+                disabled={botState.status !== 'STOPPED' || serverStatus.isActive}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  tradingMode === 'server'
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-400 hover:text-white disabled:opacity-50'
+                }`}
+              >
+                <Server className="w-4 h-4" />
+                24/7 Server
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Control Bar */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -524,7 +665,7 @@ export default function Dashboard() {
                   value={settings?.selectedMarket || 'R_10'}
                   onChange={(e) => handleMarketChange(e.target.value)}
                   className="input-field py-2 min-w-[200px]"
-                  disabled={botState.status === 'RUNNING'}
+                  disabled={botState.status === 'RUNNING' || serverStatus.isActive}
                 >
                   {MARKETS.map(m => (
                     <option key={m.symbol} value={m.symbol}>{m.name}</option>
@@ -538,7 +679,7 @@ export default function Dashboard() {
                 <div className="flex bg-[#252542] rounded-lg p-1">
                   <button
                     onClick={async () => {
-                      if (settings && botState.status !== 'RUNNING') {
+                      if (settings && botState.status !== 'RUNNING' && !serverStatus.isActive) {
                         const newSettings = { ...settings, accountType: 'demo' as const };
                         setSettings(newSettings);
                         await fetch('/api/settings', {
@@ -548,6 +689,7 @@ export default function Dashboard() {
                         });
                       }
                     }}
+                    disabled={serverStatus.isActive}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                       settings?.accountType === 'demo'
                         ? 'bg-fuchsia-600 text-white'
@@ -558,7 +700,7 @@ export default function Dashboard() {
                   </button>
                   <button
                     onClick={async () => {
-                      if (settings && botState.status !== 'RUNNING') {
+                      if (settings && botState.status !== 'RUNNING' && !serverStatus.isActive) {
                         const newSettings = { ...settings, accountType: 'live' as const };
                         setSettings(newSettings);
                         await fetch('/api/settings', {
@@ -568,6 +710,7 @@ export default function Dashboard() {
                         });
                       }
                     }}
+                    disabled={serverStatus.isActive}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                       settings?.accountType === 'live'
                         ? 'bg-red-600 text-white'
@@ -582,48 +725,118 @@ export default function Dashboard() {
 
             {/* Trading Controls */}
             <div className="flex items-center gap-3">
-              {botState.status === 'STOPPED' && (
-                <button
-                  onClick={() => setConfirmDialog({
-                    open: true,
-                    action: 'start',
-                    message: `Start trading on ${settings?.accountType?.toUpperCase()} account with ${MARKETS.find(m => m.symbol === settings?.selectedMarket)?.name}?`
-                  })}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <Play className="w-5 h-5" /> Start
-                </button>
-              )}
-              {botState.status === 'RUNNING' && (
-                <button
-                  onClick={pauseBot}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-colors"
-                >
-                  <Pause className="w-5 h-5" /> Pause
-                </button>
-              )}
-              {botState.status === 'PAUSED' && (
-                <button
-                  onClick={resumeBot}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <Play className="w-5 h-5" /> Resume
-                </button>
-              )}
-              {botState.status !== 'STOPPED' && (
-                <button
-                  onClick={() => setConfirmDialog({
-                    open: true,
-                    action: 'stop',
-                    message: 'Stop trading? This will reset your current stake and consecutive losses count.'
-                  })}
-                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-colors"
-                >
-                  <Square className="w-5 h-5" /> Stop
-                </button>
+              {tradingMode === 'server' ? (
+                // Server-side trading controls
+                <>
+                  {!serverStatus.isActive && (
+                    <button
+                      onClick={() => setConfirmDialog({
+                        open: true,
+                        action: 'server-start',
+                        message: `Start 24/7 server trading on ${settings?.accountType?.toUpperCase()} account with ${MARKETS.find(m => m.symbol === settings?.selectedMarket)?.name}?\n\nTrading will continue even when your computer is off.`
+                      })}
+                      disabled={serverLoading}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      {serverLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
+                      Start 24/7
+                    </button>
+                  )}
+                  {serverStatus.isActive && (
+                    <button
+                      onClick={() => setConfirmDialog({
+                        open: true,
+                        action: 'server-stop',
+                        message: 'Stop 24/7 server trading?'
+                      })}
+                      disabled={serverLoading}
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-colors"
+                    >
+                      {serverLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Square className="w-5 h-5" />}
+                      Stop
+                    </button>
+                  )}
+                </>
+              ) : (
+                // Browser-side trading controls
+                <>
+                  {botState.status === 'STOPPED' && (
+                    <button
+                      onClick={() => setConfirmDialog({
+                        open: true,
+                        action: 'start',
+                        message: `Start trading on ${settings?.accountType?.toUpperCase()} account with ${MARKETS.find(m => m.symbol === settings?.selectedMarket)?.name}?`
+                      })}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      <Play className="w-5 h-5" /> Start
+                    </button>
+                  )}
+                  {botState.status === 'RUNNING' && (
+                    <button
+                      onClick={pauseBot}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-colors"
+                    >
+                      <Pause className="w-5 h-5" /> Pause
+                    </button>
+                  )}
+                  {botState.status === 'PAUSED' && (
+                    <button
+                      onClick={resumeBot}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      <Play className="w-5 h-5" /> Resume
+                    </button>
+                  )}
+                  {botState.status !== 'STOPPED' && (
+                    <button
+                      onClick={() => setConfirmDialog({
+                        open: true,
+                        action: 'stop',
+                        message: 'Stop trading? This will reset your current stake and consecutive losses count.'
+                      })}
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-colors"
+                    >
+                      <Square className="w-5 h-5" /> Stop
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
+          
+          {/* Server Status Indicator */}
+          {tradingMode === 'server' && serverStatus.isActive && (
+            <div className="mt-4 pt-4 border-t border-fuchsia-900/30">
+              <div className="flex items-center gap-2 text-green-400">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-sm font-medium">24/7 Trading Active</span>
+                <span className="text-gray-400 text-sm">• {serverStatus.lastSignal}</span>
+              </div>
+              <div className="grid grid-cols-4 gap-4 mt-3">
+                <div>
+                  <span className="text-xs text-gray-400">Balance</span>
+                  <div className="font-medium text-white">${serverStatus.balance?.toFixed(2) || '0.00'}</div>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-400">Session P/L</span>
+                  <div className={`font-medium ${(serverStatus.sessionProfit || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {(serverStatus.sessionProfit || 0) >= 0 ? '+' : ''}${(serverStatus.sessionProfit || 0).toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-400">Current Stake</span>
+                  <div className="font-medium text-white">${serverStatus.currentStake?.toFixed(2) || '1.00'}</div>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-400">Consecutive Losses</span>
+                  <div className={`font-medium ${(serverStatus.consecutiveLosses || 0) >= 3 ? 'text-red-400' : 'text-white'}`}>
+                    {serverStatus.consecutiveLosses || 0}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Main Content Grid */}

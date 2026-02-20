@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST='{"components/charts.tsx -> ./recharts-wrapper":{"id":23941,"files":["static/chunks/687.9905e624ac8fa172.js","static/chunks/941.7f57552bb362d98e.js"]}}';
+self.__REACT_LOADABLE_MANIFEST='{"components/charts.tsx -> ./recharts-wrapper":{"id":83511,"files":["static/chunks/534.0345f8061626328b.js","static/chunks/511.8b88f9f19086f00a.js"]}}';
