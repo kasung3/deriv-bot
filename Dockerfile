@@ -13,8 +13,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT_MODE=standalone
 ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
 
-# Force standalone output in next.config.js
-RUN sed -i "s/output: process.env.NEXT_OUTPUT_MODE/output: 'standalone'/" next.config.js
+# Force standalone output and remove experimental outputFileTracingRoot
+RUN sed -i "s/output: process.env.NEXT_OUTPUT_MODE/output: 'standalone'/" next.config.js && \
+    sed -i '/outputFileTracingRoot/d' next.config.js
 
 RUN npx prisma generate
 RUN npm run build
