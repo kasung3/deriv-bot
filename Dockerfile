@@ -19,8 +19,10 @@ RUN sed -i "s/output: process.env.NEXT_OUTPUT_MODE/output: 'standalone'/" next.c
 RUN npx prisma generate
 RUN npm run build
 
-# Debug: Check if standalone was created
-RUN ls -la .next/ && ls -la .next/standalone/ || echo "Standalone not found"
+# Debug: Check standalone structure
+RUN echo "=== .next contents ===" && ls -la .next/ && \
+    echo "=== standalone contents ===" && ls -la .next/standalone/ && \
+    echo "=== Looking for server.js ===" && find .next -name "server.js" -type f 2>/dev/null || echo "No server.js found"
 
 FROM node:20-alpine AS runner
 WORKDIR /app
