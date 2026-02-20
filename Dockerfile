@@ -9,16 +9,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NEXT_TELEMETRY_DISABLED 1
-# Add build-time env vars to .env file
-RUN echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" >> .env && \
-    echo "NEXT_OUTPUT_MODE=standalone" >> .env
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_OUTPUT_MODE=standalone
+ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
 
 RUN npx prisma generate
 RUN npm run build
 
 # Debug: Check if standalone was created
-RUN ls -la .next/ && ls -la .next/standalone/ 2>/dev/null || echo "Standalone not found"
+RUN ls -la .next/ && ls -la .next/standalone/ || echo "Standalone not found"
 
 FROM node:20-alpine AS runner
 WORKDIR /app
