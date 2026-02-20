@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import type { Trade } from '@prisma/client';
 
 export async function GET() {
   try {
@@ -22,19 +23,19 @@ export async function GET() {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const todayTrades = allTrades.filter(t => new Date(t.createdAt) >= todayStart);
+    const todayTrades = allTrades.filter((t: Trade) => new Date(t.createdAt) >= todayStart);
 
-    const allTimeProfit = allTrades.reduce((sum, t) => sum + (t.profit || 0), 0);
-    const sessionProfit = todayTrades.reduce((sum, t) => sum + (t.profit || 0), 0);
-    const wins = allTrades.filter(t => t.result === 'WIN').length;
-    const losses = allTrades.filter(t => t.result === 'LOSS').length;
+    const allTimeProfit = allTrades.reduce((sum: number, t: Trade) => sum + (t.profit || 0), 0);
+    const sessionProfit = todayTrades.reduce((sum: number, t: Trade) => sum + (t.profit || 0), 0);
+    const wins = allTrades.filter((t: Trade) => t.result === 'WIN').length;
+    const losses = allTrades.filter((t: Trade) => t.result === 'LOSS').length;
     const totalTrades = wins + losses;
     const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
 
     // Balance history - last 20 trades
     const recentTrades = allTrades.slice(0, 20).reverse();
     let runningBalance = 0;
-    const balanceHistory = recentTrades.map(t => {
+    const balanceHistory = recentTrades.map((t: Trade) => {
       runningBalance += t.profit || 0;
       return {
         time: t.createdAt,

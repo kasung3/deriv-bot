@@ -1,1 +1,1 @@
-{"version":1,"functions":{"/api/stats":{},"/api/trades/[id]":{},"/api/settings":{},"/api/signup":{},"/api/tokens":{},"/api/trades":{}}}
+{"version":1,"functions":{"/api/trades":{},"/api/settings":{},"/api/tokens":{},"/api/trades/[id]":{},"/api/signup":{},"/api/stats":{}}}

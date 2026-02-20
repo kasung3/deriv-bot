@@ -23,9 +23,10 @@ export async function GET() {
       },
     });
 
+    type TokenResult = { id: string; tokenType: string; token: string; createdAt: Date };
     const result = {
-      demo: tokens.find(t => t.tokenType === 'demo')?.token || '',
-      live: tokens.find(t => t.tokenType === 'live')?.token || '',
+      demo: tokens.find((t: TokenResult) => t.tokenType === 'demo')?.token || '',
+      live: tokens.find((t: TokenResult) => t.tokenType === 'live')?.token || '',
     };
 
     return NextResponse.json(result);
