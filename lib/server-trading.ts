@@ -383,7 +383,7 @@ export async function startTrading(userId: string): Promise<{ success: boolean; 
     }
 
     const accountType = settings.accountType;
-    const tokenRecord = tokens.find(t => t.tokenType === accountType);
+    const tokenRecord = tokens.find((t: { tokenType: string; token: string }) => t.tokenType === accountType);
 
     if (!tokenRecord?.token) {
       return { success: false, message: `No API token configured for ${accountType} account` };
