@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #d946ef;
+  --primary-dark: #a21caf;
+  --primary-light: #f0abfc;
+  --background: #0f0f1a;
+  --surface: #1a1a2e;
+  --surface-light: #252542;
+  --text: #f8f8ff;
+  --text-muted: #9ca3af;
+  --success: #22c55e;
+  --error: #ef4444;
+}
+
+[data-hydration-error] {
+  display: none !important;
+}
+
+body {
+  background: var(--background);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #d946ef 0%, #f472b6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #d946ef 0%, #a21caf 100%);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(217, 70, 239, 0.4);
+}
+
+.input-field {
+  background: var(--surface-light);
+  border: 1px solid rgba(217, 70, 239, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: var(--text);
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 24px;
+  background: var(--surface-light);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle-switch.active {
+  background: var(--primary);
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+
+.toggle-switch.active::after {
+  transform: translateX(24px);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-dark);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}

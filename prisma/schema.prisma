@@ -1,0 +1,82 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/deriv_trading_bot/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  apiTokens     ApiToken[]
+  settings      TradingSettings?
+  trades        Trade[]
+  sessions      Session[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ApiToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenType String   // 'demo' or 'live'
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, tokenType])
+}
+
+model TradingSettings {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  initialStake          Float    @default(1.0)
+  martingaleFactor      Float    @default(2.0)
+  maxConsecutiveLosses  Int      @default(5)
+  maxConsecutiveLossesEnabled Boolean @default(true)
+  maxStake              Float    @default(100.0)
+  maxStakeEnabled       Boolean  @default(true)
+  dailyLossLimit        Float    @default(50.0)
+  dailyLossLimitEnabled Boolean  @default(true)
+  atrThreshold          Float    @default(0.0005)
+  selectedMarket        String   @default("R_10")
+  accountType           String   @default("demo")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Trade {
+  id              String   @id @default(cuid())
+  userId          String
+  contractId      String?
+  market          String
+  direction       String   // 'RISE' or 'FALL'
+  stake           Float
+  entryPrice      Float?
+  exitPrice       Float?
+  profit          Float?
+  result          String?  // 'WIN', 'LOSS', 'PENDING'
+  entryTime       DateTime
+  exitTime        DateTime?
+  sma5            Float?
+  sma6            Float?
+  atr             Float?
+  accountType     String   // 'demo' or 'live'
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
