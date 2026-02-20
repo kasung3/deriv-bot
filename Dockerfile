@@ -10,12 +10,14 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED 1
-ENV NEXT_OUTPUT_MODE standalone
 # Dummy DATABASE_URL for build-time only (Prisma generate)
 ENV DATABASE_URL "postgresql://dummy:dummy@localhost:5432/dummy"
 
 RUN npx prisma generate
-RUN npm run build
+RUN NEXT_OUTPUT_MODE=standalone npm run build
+
+# Verify standalone output was created
+RUN ls -la .next/standalone/
 
 FROM node:20-alpine AS runner
 WORKDIR /app
