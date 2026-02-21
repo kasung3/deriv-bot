@@ -18,7 +18,11 @@ RUN sed -i "s/output: process.env.NEXT_OUTPUT_MODE/output: 'standalone'/" next.c
     sed -i "s/experimental: {[^}]*}/experimental: {}/" next.config.js && \
     cat next.config.js
 
-RUN npx prisma generate
+RUN npx prisma generate && \
+    echo "=== Prisma client files ===" && \
+    ls -la node_modules/.prisma/client/ || echo "No .prisma/client directory" && \
+    ls -la node_modules/@prisma/client/ || echo "No @prisma/client directory"
+
 RUN npm run build
 
 # Debug: Check standalone structure
@@ -43,6 +47,12 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
+
+# Debug: Verify Prisma files in runner
+RUN echo "=== Runner Prisma verification ===" && \
+    ls -la node_modules/.prisma/client/ || echo "No .prisma/client" && \
+    ls -la node_modules/@prisma/client/ || echo "No @prisma/client" && \
+    ls -la node_modules/.prisma/client/*.node 2>/dev/null || echo "No binary engine files"
 
 USER nextjs
 
