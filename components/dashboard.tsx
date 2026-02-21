@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: string; message: string }>({ open: false, action: '', message: '' });
   const [activeTab, setActiveTab] = useState<'status' | 'settings' | 'tokens'>('status');
   const [stats, setStats] = useState({ allTimeProfit: 0, sessionProfit: 0, wins: 0, losses: 0, winRate: 0, balanceHistory: [] });
@@ -99,9 +100,18 @@ export default function Dashboard() {
         
         if (settingsRes.ok) {
           const s = await settingsRes.json();
-          setSettings(s);
-          setBotState(prev => ({ ...prev, currentStake: s.initialStake }));
-          currentStakeRef.current = s.initialStake;
+          if (s && !s.error) {
+            setSettings(s);
+            setBotState(prev => ({ ...prev, currentStake: s.initialStake }));
+            currentStakeRef.current = s.initialStake;
+          } else {
+            console.error('Settings API returned error:', s.error);
+            setLoadError('Failed to load settings: ' + (s.error || 'Unknown error'));
+          }
+        } else {
+          const errData = await settingsRes.json().catch(() => ({}));
+          console.error('Settings API failed:', settingsRes.status, errData);
+          setLoadError('Failed to load settings: ' + (errData.error || 'Server error'));
         }
         if (tokensRes.ok) setTokens(await tokensRes.json());
         if (tradesRes.ok) setTrades(await tradesRes.json());
@@ -679,43 +689,51 @@ export default function Dashboard() {
                 <div className="flex bg-[#252542] rounded-lg p-1">
                   <button
                     onClick={async () => {
-                      if (settings && botState.status !== 'RUNNING' && !serverStatus.isActive) {
-                        const newSettings = { ...settings, accountType: 'demo' as const };
-                        setSettings(newSettings);
-                        await fetch('/api/settings', {
+                      if (botState.status !== 'RUNNING' && !serverStatus.isActive) {
+                        const newSettings = { ...(settings || {}), accountType: 'demo' as const };
+                        setSettings(newSettings as TradingSettings);
+                        const res = await fetch('/api/settings', {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ accountType: 'demo' }),
                         });
+                        if (res.ok) {
+                          const updated = await res.json();
+                          setSettings(updated);
+                        }
                       }
                     }}
-                    disabled={serverStatus.isActive}
+                    disabled={serverStatus.isActive || botState.status === 'RUNNING'}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                       settings?.accountType === 'demo'
                         ? 'bg-fuchsia-600 text-white'
                         : 'text-gray-400 hover:text-white'
-                    }`}
+                    } ${serverStatus.isActive || botState.status === 'RUNNING' ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     Demo
                   </button>
                   <button
                     onClick={async () => {
-                      if (settings && botState.status !== 'RUNNING' && !serverStatus.isActive) {
-                        const newSettings = { ...settings, accountType: 'live' as const };
-                        setSettings(newSettings);
-                        await fetch('/api/settings', {
+                      if (botState.status !== 'RUNNING' && !serverStatus.isActive) {
+                        const newSettings = { ...(settings || {}), accountType: 'live' as const };
+                        setSettings(newSettings as TradingSettings);
+                        const res = await fetch('/api/settings', {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ accountType: 'live' }),
                         });
+                        if (res.ok) {
+                          const updated = await res.json();
+                          setSettings(updated);
+                        }
                       }
                     }}
-                    disabled={serverStatus.isActive}
+                    disabled={serverStatus.isActive || botState.status === 'RUNNING'}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                       settings?.accountType === 'live'
                         ? 'bg-red-600 text-white'
                         : 'text-gray-400 hover:text-white'
-                    }`}
+                    } ${serverStatus.isActive || botState.status === 'RUNNING' ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     Live
                   </button>
@@ -874,19 +892,28 @@ export default function Dashboard() {
               {activeTab === 'status' && (
                 <StatusPanel botState={botState} settings={settings} />
               )}
-              {activeTab === 'settings' && settings && (
-                <TradingSettingsPanel
-                  settings={settings}
-                  onUpdate={async (newSettings) => {
-                    setSettings(newSettings);
-                    await fetch('/api/settings', {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(newSettings),
-                    });
-                  }}
-                  disabled={botState.status !== 'STOPPED'}
-                />
+              {activeTab === 'settings' && (
+                settings ? (
+                  <TradingSettingsPanel
+                    settings={settings}
+                    onUpdate={async (newSettings) => {
+                      setSettings(newSettings);
+                      await fetch('/api/settings', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newSettings),
+                      });
+                    }}
+                    disabled={botState.status !== 'STOPPED'}
+                  />
+                ) : (
+                  <div className="card">
+                    <div className="text-red-400 text-center py-8">
+                      <p className="mb-2">Failed to load settings</p>
+                      <p className="text-sm text-gray-400">{loadError || 'Please refresh the page or check the database connection'}</p>
+                    </div>
+                  </div>
+                )
               )}
               {activeTab === 'tokens' && (
                 <TokenSettings
