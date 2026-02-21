@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"components/charts.tsx -> ./recharts-wrapper\":{\"id\":\"components/charts.tsx -> ./recharts-wrapper\",\"files\":[\"static/chunks/_app-pages-browser_components_recharts-wrapper_tsx.js\"]}}"
