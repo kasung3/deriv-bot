@@ -36,3 +36,5 @@ yarn-error.log*
 # Misc
 *.swp
 *.swo
+node_modules
+yarn.lock
