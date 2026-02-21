@@ -13,22 +13,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT_MODE=standalone
 ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
 
-# Force standalone output and clean experimental section
+# Force standalone output only (keep serverExternalPackages)
 RUN sed -i "s/output: process.env.NEXT_OUTPUT_MODE/output: 'standalone'/" next.config.js && \
-    sed -i "s/experimental: {[^}]*}/experimental: {}/" next.config.js && \
     cat next.config.js
 
-RUN npx prisma generate && \
-    echo "=== Prisma client files ===" && \
-    ls -la node_modules/.prisma/client/ || echo "No .prisma/client directory" && \
-    ls -la node_modules/@prisma/client/ || echo "No @prisma/client directory"
+RUN npx prisma generate
 
 RUN npm run build
-
-# Debug: Check standalone structure
-RUN echo "=== .next contents ===" && ls -la .next/ && \
-    echo "=== standalone contents ===" && ls -la .next/standalone/ && \
-    echo "=== Looking for server.js ===" && find .next -name "server.js" -type f 2>/dev/null || echo "No server.js found"
 
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -43,16 +34,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone/app ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy Prisma client from builder's node_modules (where prisma generate creates it)
+# Copy Prisma client from builder's node_modules
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
-
-# Debug: Verify Prisma files in runner
-RUN echo "=== Runner Prisma verification ===" && \
-    ls -la node_modules/.prisma/client/ || echo "No .prisma/client" && \
-    ls -la node_modules/@prisma/client/ || echo "No @prisma/client" && \
-    ls -la node_modules/.prisma/client/*.node 2>/dev/null || echo "No binary engine files"
 
 USER nextjs
 
